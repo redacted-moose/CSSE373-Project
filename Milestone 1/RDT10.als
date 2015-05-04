@@ -53,7 +53,7 @@ pred Trace {
 		some d: Data | Progress[ss, ss', rs, rs'] and SendStep[ss, ss', d] and RecvStep[rs, rs', d]
 }
 
-run Trace for 3 SendState, 3 RecvState,  2 Data
+run Trace for 2 SendState, 2 RecvState,  1 Data
 
 assert AlwaysTransmitted {
 	Trace[]
