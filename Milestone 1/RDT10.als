@@ -1,62 +1,54 @@
-open util/ordering[SendState] as SSO
-open util/ordering[RecvState] as RSO
+open util/ordering[State] as SO
 
 sig Data {}
-sig SendState {
-	buffer: set Data
-}
-sig RecvState {
-	buffer: set Data
+
+sig Packet {
+	data: Data
 }
 
-pred SendState.InitSend[] {
-	this.buffer = Data
+sig State {
+	sendBuffer: set Packet,
+	recvBuffer: set Packet
 }
 
-run InitSend for 1 SendState, 1 RecvState, exactly 10 Data
-
-pred SendState.End[] {
-	#this.buffer = 0
+pred State.Init[] {
+	this.sendBuffer = Packet
+	#this.recvBuffer = 0
 }
 
-pred RecvState.Init[] {
-	#this.buffer = 0
+// run InitSend for 1 SendState, 1 RecvState, exactly 10 Data
+
+pred State.End[] {
+	#this.sendBuffer = 0
+	this.recvBuffer = Packet
 }
 
-run Init for 1 SendState, 1 RecvState, exactly 10 Data
+// run Init for 1 SendState, 1 RecvState, exactly 10 Data
 
-pred RecvState.End[] {
-	this.buffer = Data
+pred Step[s, s': State, p: Packet] {
+	s'.sendBuffer = s.sendBuffer - p
+	s'.recvBuffer = s.recvBuffer + p
 }
 
-pred SendStep[s, s': SendState, d: Data] {
-	s'.buffer = s.buffer - d
-}
+// run SendStep for exactly 2 SendState, exactly 2 RecvState, exactly 2 Data
 
-run SendStep for exactly 2 SendState, exactly 2 RecvState, exactly 2 Data
+// run RecvStep for exactly 2 SendState, exactly 2 RecvState, exactly 2 Data
 
-pred RecvStep[s, s': RecvState, d: Data] {
-	s'.buffer = s.buffer + d
-}
-
-run RecvStep for exactly 2 SendState, exactly 2 RecvState, exactly 2 Data
-
-pred Progress[ss, ss': SendState, rs, rs': RecvState] {
-	(#ss.buffer > #ss'.buffer and #rs.buffer < #rs'.buffer) or
-	(ss'.End[] and rs'.End[])
+pred Progress[s, s': State] {
+	(#s.sendBuffer > #s'.sendBuffer and #s.recvBuffer < #s'.recvBuffer) or
+	s'.End[]
 }
 
 pred Trace {
-	SSO/first[].InitSend[]
-	RSO/first[].Init[]
-	all ss: SendState - SSO/last[], rs: RecvState - RSO/last[] | let ss' = SSO/next[ss], rs' = RSO/next[rs]|
-		some d: Data | Progress[ss, ss', rs, rs'] and SendStep[ss, ss', d] and RecvStep[rs, rs', d]
+	SO/first[].Init[]
+	all s: State - SO/last[] | let s' = SO/next[s] |
+		some p: Packet | Progress[s, s'] and Step[s, s', p]
 }
 
-run Trace for 2 SendState, 2 RecvState,  1 Data
+run Trace for 3 State,  2 Data, 2 Packet
 
 assert AlwaysTransmitted {
 	Trace[]
 }
 
-check AlwaysTransmitted for 3 SendState, 3 RecvState, 2 Data
+check AlwaysTransmitted for 3 State, 2 Data, 2 Packet
