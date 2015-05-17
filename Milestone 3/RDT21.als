@@ -7,7 +7,7 @@ one sig Check {
 	sums: Data -> Checksum
 }
 
-fact {all d: Data | one c: Checksum | d = Check.sums.c and d.(Check.sums) = c}
+fact {all d: Data | some c: Checksum | d = Check.sums.c and d.(Check.sums) = c}
 
 abstract sig SequenceNumber {}
 
@@ -47,6 +47,7 @@ pred State.Init[] {
 	this.currentState = CallFromAbove
 	this.sendBuffer = {p: Packet - NAK - ACK | p.checksum = (p.data).(Check.sums)}
 	#this.recvBuffer = 0
+	//NAK = p: Packet | p.checksum = (p.data).(Check.sums)
 	//this.lastSent = NAK
 }
 
@@ -72,7 +73,13 @@ fun GarbleData[p: Packet]: Packet {
 	{p': Packet | some d: Data - p.data | p'.data = d and p'.checksum = p.checksum}
 }
 
-run GarbleData for exactly 1 Packet, exactly 2 Data, exactly 2 Checksum, exactly 1 State
+run GarbleData for exactly 1 Packet, exactly 2 Data, exactly 2 Checksum, exactly 2 State
+
+fun MakePacket[d: Data, c: Checksum] : Packet {
+	{p: Packet | p.data = d and p.checksum = c}
+}
+
+run MakePacket for exactly 1 Packet, exactly 2 Data, exactly 2 Checksum, exactly 2 State
 
 pred Send[s, s': State] {
 	one p: s.sendBuffer | 
