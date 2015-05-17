@@ -33,8 +33,8 @@ abstract sig StateMarker {}
 one sig CallFromAbove, WaitACKNAK, CallFromBelow extends StateMarker {}
 
 sig State {
-	sendBuffer: set Packet,
-	recvBuffer: set Packet,
+	sendBuffer: set Data,
+	recvBuffer: set Data,
 
 	lastSent: Packet, // Packet last sent by sender
 	currentPacket: Packet, // Packet currently being sent
@@ -45,7 +45,8 @@ sig State {
 
 pred State.Init[] {
 	this.currentState = CallFromAbove
-	this.sendBuffer = {p: Packet - NAK - ACK | p.checksum = (p.data).(Check.sums)}
+	//this.sendBuffer = {p: Packet - NAK - ACK | p.checksum = (p.data).(Check.sums)}
+	this.sendBuffer = Data
 	#this.recvBuffer = 0
 	//NAK = p: Packet | p.checksum = (p.data).(Check.sums)
 	//this.lastSent = NAK
@@ -55,7 +56,8 @@ run Init for 1 State, exactly 5 Data, exactly 5 Checksum, exactly 7 Packet
 
 pred State.End[] {
 	#this.sendBuffer = 0
-	this.recvBuffer = {p: Packet - NAK - ACK | p.checksum = (p.data).(Check.sums)}
+	//this.recvBuffer = {p: Packet - NAK - ACK | p.checksum = (p.data).(Check.sums)}
+	this.recvBuffer = Data
 }
 
 run End for 1 State, exactly 5 Data, exactly 5 Checksum, exactly 7 Packet
@@ -69,21 +71,34 @@ pred Step[s, s': State] {
 run Step for exactly 5 Packet, exactly 3 Data, exactly 3 Checksum, exactly 2 State
 run Step for exactly 2 State, exactly 6 Packet, exactly 4 Data, exactly 4 Checksum
 
-fun GarbleData[p: Packet]: Packet {
-	{p': Packet | some d: Data - p.data | p'.data = d and p'.checksum = p.checksum}
+//fun GarbleData[p: Packet]: one Packet {
+	//{p': Packet | some d: Data - p.data | p'.data = d and p'.checksum = p.checksum}
+//}
+
+run {
+	some p: Packet | not GarbleData[p].data = p.data
 }
 
-run GarbleData for exactly 1 Packet, exactly 2 Data, exactly 2 Checksum, exactly 2 State
-
-fun MakePacket[d: Data, c: Checksum] : Packet {
+fun MakePacket[d: Data, c: Checksum] : one Packet {
+	//{p: Packet | p.data = d and p.checksum = c}
 	{p: Packet | p.data = d and p.checksum = c}
 }
 
 run MakePacket for exactly 1 Packet, exactly 2 Data, exactly 2 Checksum, exactly 2 State
 
+fun Sum[d: Data] : one Checksum {
+	d.(Check.sums)
+}
+
+//run {
+//	some d: Data | 
+//}
+
 pred Send[s, s': State] {
-	one p: s.sendBuffer | 
-		s'.sendBuffer = s.sendBuffer - p and
+	one d: s.sendBuffer |
+		let c = d.(Check.sums) | 
+		let p = {p: Packet - NAK - ACK | p.data = d and p.checksum = c} |
+		s'.sendBuffer = s.sendBuffer - d and
 		s'.lastSent = p and
 		s'.currentPacket = p and
 		s'.recvBuffer = s.recvBuffer and
@@ -97,7 +112,7 @@ pred Recv[s, s': State] {
 	s'.sendBuffer = s.sendBuffer and
 	s'.lastSent = s.lastSent and
 	(isUncorrupt[s.currentPacket] implies
-		s'.recvBuffer = s.recvBuffer + s.currentPacket and
+		s'.recvBuffer = s.recvBuffer + s.currentPacket.data and
 		s'.currentPacket = ACK
 	else isCorrupt[s.currentPacket] implies
 		s'.recvBuffer = s.recvBuffer and
@@ -163,7 +178,7 @@ pred Trace {
 		Progress[s, s'] and Step[s, s']
 }
 
-run Trace for 10 State,  exactly 3 Data, exactly 5 Packet, exactly 3 Checksum, exactly 2 SequenceNumber, exactly 3 StateMarker
+run Trace for 10 State,  exactly 3 Data, exactly 10 Packet, exactly 3 Checksum, exactly 2 SequenceNumber, exactly 3 StateMarker
 
 assert AlwaysTransmitted {
 	Trace[]
